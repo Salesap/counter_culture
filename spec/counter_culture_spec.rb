@@ -26,6 +26,8 @@ require 'models/soft_delete_paranoia'
 require 'models/conversation'
 require 'models/candidate_profile'
 require 'models/candidate'
+require 'models/with_module/model1'
+require 'models/with_module/model2'
 
 require 'database_cleaner'
 DatabaseCleaner.strategy = :deletion
@@ -1782,6 +1784,68 @@ describe "CounterCulture" do
       sd.undiscard
       expect(company.reload.soft_delete_discards_count).to eq(1)
     end
+
+    describe "when calling hard-destroy" do
+      it "does not run destroy callback for discarded records" do
+        skip("Unsupported in this version of Rails") if Rails.version < "4.2.0"
+
+        company = Company.create!
+        sd = SoftDeleteDiscard.create!(company_id: company.id)
+
+        expect(company.reload.soft_delete_discards_count).to eq(1)
+
+        sd.discard
+        expect(company.reload.soft_delete_discards_count).to eq(0)
+
+        sd.destroy
+        expect(company.reload.soft_delete_discards_count).to eq(0)
+      end
+
+      it "runs destroy callback for undiscarded records" do
+        skip("Unsupported in this version of Rails") if Rails.version < "4.2.0"
+
+        company = Company.create!
+        sd = SoftDeleteDiscard.create!(company_id: company.id)
+
+        expect(company.reload.soft_delete_discards_count).to eq(1)
+
+        sd.destroy
+        expect(company.reload.soft_delete_discards_count).to eq(0)
+      end
+    end
+
+    describe "dynamic column names with totaling instead of counting" do
+      describe 'when updating discarded records' do
+        it 'does not update sum' do
+          skip("Unsupported in this version of Rails") if Rails.version < "4.2.0"
+
+          company = Company.create!
+          sd = SoftDeleteDiscard.create!(company_id: company.id, value: 5)
+
+          expect(company.reload.soft_delete_discard_values_sum).to eq(5)
+
+          sd.discard
+          expect(company.reload.soft_delete_discard_values_sum).to eq(0)
+
+          sd.update value: 10
+          expect(company.reload.soft_delete_discard_values_sum).to eq(0)
+        end
+      end
+
+      describe 'when updating undiscarded records' do
+        it 'updates sum' do
+          skip("Unsupported in this version of Rails") if Rails.version < "4.2.0"
+
+          company = Company.create!
+          sd = SoftDeleteDiscard.create!(company_id: company.id, value: 5)
+
+          expect(company.reload.soft_delete_discard_values_sum).to eq(5)
+
+          sd.update value: 10
+          expect(company.reload.soft_delete_discard_values_sum).to eq(10)
+        end
+      end
+    end
   end
 
   describe "when using paranoia for soft deletes" do
@@ -1837,6 +1901,68 @@ describe "CounterCulture" do
 
       sd.restore
       expect(company.reload.soft_delete_paranoia_count).to eq(1)
+    end
+
+    describe "when calling paranoia really destroy" do
+      it "does not run destroy callback for paranoia destroyed records" do
+        skip("Unsupported in this version of Rails") if Rails.version < "4.2.0"
+
+        company = Company.create!
+        sd = SoftDeleteParanoia.create!(company_id: company.id)
+
+        expect(company.reload.soft_delete_paranoia_count).to eq(1)
+
+        sd.destroy
+        expect(company.reload.soft_delete_paranoia_count).to eq(0)
+
+        sd.really_destroy!
+        expect(company.reload.soft_delete_paranoia_count).to eq(0)
+      end
+
+      it "runs really destroy callback for paranoia undestroyed records" do
+        skip("Unsupported in this version of Rails") if Rails.version < "4.2.0"
+        company = Company.create!
+        expect(company.soft_delete_paranoia_count).to eq(0)
+        sd = SoftDeleteParanoia.create!(company_id: company.id)
+        expect(company.reload.soft_delete_paranoia_count).to eq(1)
+
+        sd.really_destroy!
+        expect{ sd.reload }.to raise_error(ActiveRecord::RecordNotFound)
+        expect(company.reload.soft_delete_paranoia_count).to eq(0)
+      end
+    end
+
+    describe "dynamic column names with totaling instead of counting" do
+      describe 'when updating soft deleted records' do
+        it 'does not update sum' do
+          skip("Unsupported in this version of Rails") if Rails.version < "4.2.0"
+
+          company = Company.create!
+          sd = SoftDeleteParanoia.create!(company_id: company.id, value: 5)
+
+          expect(company.reload.soft_delete_paranoia_values_sum).to eq(5)
+
+          sd.destroy
+          expect(company.reload.soft_delete_paranoia_values_sum).to eq(0)
+
+          sd.update value: 10
+          expect(company.reload.soft_delete_paranoia_values_sum).to eq(0)
+        end
+      end
+
+      describe 'when updating undestroyed records' do
+        it 'updates sum' do
+          skip("Unsupported in this version of Rails") if Rails.version < "4.2.0"
+
+          company = Company.create!
+          sd = SoftDeleteParanoia.create!(company_id: company.id, value: 5)
+
+          expect(company.reload.soft_delete_paranoia_values_sum).to eq(5)
+
+          sd.update value: 10
+          expect(company.reload.soft_delete_paranoia_values_sum).to eq(10)
+        end
+      end
     end
   end
 
@@ -2093,6 +2219,23 @@ describe "CounterCulture" do
 
       expect(user.reviews_count).to eq(1)
       expect(user.versions.count).to eq(1)
+    end
+  end
+
+  describe "with a module for the model" do
+    it "works" do
+      model2 = WithModule::Model2.create!
+      5.times { WithModule::Model1.create!(model2: model2) }
+
+      model2.reload
+      expect(model2.model1s_count).to eq(5)
+
+      model2.update_column(:model1s_count, -1)
+
+      WithModule::Model1.counter_culture_fix_counts
+
+      model2.reload
+      expect(model2.model1s_count).to eq(5)
     end
   end
 

@@ -1,3 +1,28 @@
+## 2.1.4 (January 21, 2019)
+
+Improvements:
+  - Avoid instantiating model class during `counter_culture` call (#246)
+
+## 2.1.3 (January 19, 2019)
+
+Bugfixes:
+  - Don't update running total on soft-deleted records (#244)
+
+## 2.1.2 (December 7, 2018)
+
+Bugfixes:
+  - Properly handle `destroy` and `really_destroy` when using Paranoia (#239)
+
+## 2.1.1 (November 7, 2018)
+
+Bugfixes:
+  - Don't double-decrement when discarding and then hard-destroying a record (#237)
+
+## 2.1.0 (October 19, 2018)
+
+Bugfixes:
+  - Fix behavior with Models that are part of a module (ex: `Users::Admin`) (#234)
+
 ## 2.0.1 (August 19, 2018)
 
 Bugfixes:
