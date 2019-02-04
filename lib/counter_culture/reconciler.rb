@@ -229,10 +229,14 @@ module CounterCulture
 
             # respect the discard column if it exists
             if defined?(Discard::Model) &&
-               model.include?(Discard::Model) &&
-               model.column_names.include?(model.discard_column.to_s)
+               model.include?(Discard::Model)
+              if model.column_names.include?(model.discard_column.to_s)
+                joins_sql += " AND #{target_table_alias}.#{model.discard_column} IS NULL"
+              end
 
-              joins_sql += " AND #{target_table_alias}.#{model.discard_column} IS NULL"
+              if model.respond_to?(:archive_column) && model.column_names.include?(model.archive_column.to_s)
+                joins_sql += " AND #{target_table_alias}.#{model.archive_column} IS NULL"
+              end
             end
           end
           joins_sql

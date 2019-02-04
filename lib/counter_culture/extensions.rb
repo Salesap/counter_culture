@@ -30,17 +30,34 @@ module CounterCulture
 
           after_update :_update_counts_after_update, unless: :destroyed_for_counter_culture?
 
-          if respond_to?(:before_restore)
+          if respond_to?(:before_restore) && !respond_to?(:before_archive)
             before_restore :_update_counts_after_create,
               if: -> (model) { model.deleted? }
           end
 
-          if defined?(Discard::Model) && include?(Discard::Model)
+          if defined?(Discard::Model) && include?(Discard::Model) && !respond_to?(:before_archive)
             before_discard :_update_counts_after_destroy,
               if: ->(model) { !model.discarded? }
 
             before_undiscard :_update_counts_after_create,
               if: ->(model) { model.discarded? }
+          end
+
+          if defined?(Discard::Model) && include?(Discard::Model) && respond_to?(:before_archive)
+            before_discard :_update_counts_after_destroy,
+                           if: ->(model) { model.actual? }
+
+            before_undiscard :_update_counts_after_create,
+                             if: ->(model) { model.discarded? && !model.archived? }
+
+            before_archive :_update_counts_after_destroy,
+                           if: ->(model) { model.actual? }
+
+            before_unarchive :_update_counts_after_create,
+                             if: ->(model) { model.archived? && !model.discarded? }
+
+            before_restore :_update_counts_after_create,
+                           if: -> (model) { model.archived? || model.discarded? }
           end
 
           # we keep a list of all counter caches we must maintain
@@ -130,7 +147,7 @@ module CounterCulture
       if respond_to?(:paranoia_destroyed?)
         paranoia_destroyed?
       elsif defined?(Discard::Model) && self.class.include?(Discard::Model)
-        discarded?
+        respond_to?(:archived?) ? discarded? || archived? : discarded?
       else
         false
       end
